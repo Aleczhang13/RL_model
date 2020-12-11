@@ -1,7 +1,6 @@
-from environments.maze import Maze
-import numpy as np
 import pandas as pd
-
+import numpy as np
+from environments.maze import Maze
 
 class RL(object):
     # 初始化
@@ -38,64 +37,66 @@ class RL(object):
         pass
 
 
-# QLearning继承RL
-class QLearningTable(RL):
-    # 初始化
-    # 参数自己定义，含义继承父类RL
-    # 类方法choose_action、check_state_exist自动继承RL，参数不变
-    def __init__(self, actions, learning_rate=0.01, reward_decay=0.9, e_greedy=0.9):
-        super(QLearningTable, self).__init__(actions, learning_rate, reward_decay, e_greedy)
+class SarasaTable(RL):
+    def __init__(self,actions, learning_rate=0.01, reward_decay=0.9,e_greedy=0.9):
+        super(SarasaTable,self).__init__(actions, learning_rate, reward_decay, e_greedy)
 
-    # 根绝当前观察状态s，选择动作a，选择动作后的奖励r，和执行动作后的状态s_，来更新qtable
-    def learning(self, s, a, r, s_):
-        self.check_state_exist(s_)  # 检查动作后状态s_是否存在
+    def learning(self, s, a,r, s_, a_):
+        self.check_state_exist(s_)
 
-        q_old = self.q_table.loc[s, a]  # 旧的q[s,a]值
-        # 相应的贝尔公式
-        if s_ != 'terminal':
-            # 下个状态下最大的值
-            max_s_ = self.q_table.loc[s_, :].max()
-            q_new = r + self.gamma * max_s_  # 计算新的值
+        q_old = self.q_table.loc[s,a]
+
+        if s_ !="terminal":
+            q_predict = self.q_table.loc[s_, a_]
+            q_new = r+self.gamma*q_predict
         else:
             q_new = r
 
-        self.q_table.loc[s, a] = q_old - self.lr * (q_new - q_old)  # 根据更新公式更新，类似于梯度下降
+        self.q_table.loc[s,a] = q_old- self.lr * (q_new-q_old)
 
 
 def update():
     for episode in range(100):
-        # 初始化 state 的观测值
-        observation = env.reset()  # 每轮训练都要初始化观测值，即回到原点状态
+        # 初始化环境
+        observation = env.reset()
+
+        # 根据当前状态选行为
+        action = RL.choose_action(str(observation))
 
         while True:
+            # 刷新环境
             env.render()
 
-            # RL 根据 state 的观测值挑选 action
-            action = RL.choose_action(str(observation))  # qlearning采用greeed方法，选择q值最大的action
-
-            # 探索者在环境中实施这个 action, 并得到环境返回的下一个 state 观测值, reward 和 done (是否是掉下地狱或者升上天堂)
-            # 是根据当前选择动作，观察到的采取动作后的状态和奖励
+            # 在环境中采取行为, 获得下一个 state_ (obervation_), reward, 和是否终止
             observation_, reward, done = env.step(action)
 
-            # RL 从这个序列 (state, action, reward, state_) 中学习
-            # 根绝旧observation的q值，和采取动作，以及奖励和采取动作后的observation_的最大q值进行更新
-            RL.learning(str(observation), action, reward, str(observation_))
+            # 根据observation_选择observation_下应该选择的动作action_
+            action_ = RL.choose_action(str(observation_))
 
-            # 将下一个 state 的值传到下一次循环
+            # 从当前状态state，当前动作action，奖励r，执行动作后state_，state_下的action_,(s,a,r,s,a)
+            RL.learning(str(observation), action, reward, str(observation_), action_)
+
+            # 将下一个当成下一步的 state (observation) and action。
+            # 与qlearning的却别是sarsa在observation_下真正执行了动作action_，供下次使用
+            # 而qlearning中下次状态observation_时还要重新选择action_
             observation = observation_
+            action = action_
 
+            # 终止时跳出循环
             if done:
                 break
 
-    # 结束游戏并关闭窗口
+
+    # 大循环完毕
     print('game over')
     env.destroy()
 
-
-if __name__ == "__main__":
-    # 定义环境 env 和 RL 方式
+if __name__ == '__main__':
     env = Maze()
-    RL = QLearningTable(actions=list(range(env.n_actions)))
-    # 开始可视化环境 env
+
+    # Sarsa和SarsaLambda的调用方式一模一样
+    RL = SarasaTable(actions=list(range(env.n_actions)))
+
     env.after(100, update)
     env.mainloop()
+
