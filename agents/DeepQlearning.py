@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from environments.maze_env import Maze
 import tensorflow as tf
+tf.compat.v1.disable_eager_execution()
 class DeepQNetwork(object):
     def __init__(self, n_actions,n_features, learning_rate=0.001, reward_decay=0.9,e_greedy=0.9,replace_target_iter=300, memory_size=500,batch_size=32,e_greedy_increment=None,output_graph=False):
         self.n_actions = n_actions
@@ -13,8 +14,7 @@ class DeepQNetwork(object):
         self.memory_size = memory_size # 记忆上线
         self.batch_size = batch_size
         self.epsilon_increment = e_greedy_increment
-
-        self.epslion = 0 if e_greedy_increment is not None else self.epslion_max
+        self.epsilon = 0 if e_greedy_increment is not None else self.epsilon_max
 
         # 记录相应的学习的次数，判断是否需要进行target_net参数
         self.learn_step_counter = 0
@@ -23,16 +23,16 @@ class DeepQNetwork(object):
         self._build_net()
 
         # 替换相应的target net的参数
-        t_params = tf.get_collection("target_net_params")
-        e_params = tf.get_collection("eval_net_params")
+        t_params = tf.compat.v1.get_collection("target_net_params")
+        e_params = tf.compat.v1.get_collection("eval_net_params")
 
-        self.replace_target_op = [tf.assign(t, e) for t,e in zip(t_params, e_params)]
+        self.replace_target_op = [tf.compat.v1.assign(t, e) for t,e in zip(t_params, e_params)]
 
-        self.session = tf.Session()
+        self.session = tf.compat.v1.Session()
         if output_graph:
-            tf.summary.FileWriter("logs/", self.session.graph)
+            tf.compat.v1.summary.FileWriter("logs/", self.session.graph)
 
-        self.session.run(tf.global_variables_initializer())
+        self.session.run(tf.compat.v1.global_variables_initializer())
         self.cost_his = []
 
     #建立相应的menory
@@ -49,55 +49,55 @@ class DeepQNetwork(object):
         self.memory_counter += 1
 
     def _build_net(self):
-        tf.reset_default_graph() # 清空计算图
+        tf.compat.v1.reset_default_graph() # 清空计算图
 
-        self.s = tf.placeholder(tf.float32, [None, self.n_features], name = "s")
-        self.q_target = tf.placeholder(tf.float32, [ None, self.n_actions], name = "Q_target")
+        self.s = tf.compat.v1.placeholder(tf.float32, [None, self.n_features], name = "s")
+        self.q_target = tf.compat.v1.placeholder(tf.float32, [ None, self.n_actions], name = "Q_target")
 
-        with tf.variable_scope("eval_net"):
-            c_names = ["eval_net_params", tf.GraphKeys.GLOBAL_VARIABLES]
+        with tf.compat.v1.variable_scope("eval_net"):
+            c_names = ["eval_net_params", tf.compat.v1.GraphKeys.GLOBAL_VARIABLES]
             n_l1 = 10
             w_initializer = tf.random_normal_initializer(0,0.3)
             b_initializer = tf.constant_initializer(0.1)
 
-            with tf.variable_scope("l1"):
-                w1 = tf.get_variable("w1", [self.n_features, n_l1], initializer=w_initializer,collections=c_names)
-                b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
+            with tf.compat.v1.variable_scope("l1"):
+                w1 = tf.compat.v1.get_variable("w1", [self.n_features, n_l1], initializer=w_initializer,collections=c_names)
+                b1 = tf.compat.v1.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
                 l1 = tf.nn.relu(tf.matmul(self.s, w1) + b1)
 
             # eval_network第二层全连接神经网络
-            with tf.variable_scope('l1'):
-                w2 = tf.get_variable('w2', [n_l1, self.n_actions], initializer=w_initializer, collections=c_names)
-                b2 = tf.get_variable('b2', [1, self.n_actions], initializer=b_initializer, collections=c_names)
+            with tf.compat.v1.variable_scope('l1'):
+                w2 = tf.compat.v1.get_variable('w2', [n_l1, self.n_actions], initializer=w_initializer, collections=c_names)
+                b2 = tf.compat.v1.get_variable('b2', [1, self.n_actions], initializer=b_initializer, collections=c_names)
                 # 求出q估计值，长度为n_actions的向量
                 self.q_eval = tf.matmul(l1, w2) + b2
 
         # 创建target network，输入选择一个action后的状态s_,输出q_target
-        self.s_ = tf.placeholder(tf.float32, [None, self.n_features], name='s_')  # 接收下个 observation
-        with tf.variable_scope('target_net'):
-            c_names = ['target_net_params', tf.GraphKeys.GLOBAL_VARIABLES]
+        self.s_ = tf.compat.v1.placeholder(tf.float32, [None, self.n_features], name='s_')  # 接收下个 observation
+        with tf.compat.v1.variable_scope('target_net'):
+            c_names = ['target_net_params', tf.compat.v1.GraphKeys.GLOBAL_VARIABLES]
 
             # target_net 的第一层fc， collections 是在更新 target_net 参数时会用到
-            with tf.variable_scope('l1'):
-                w1 = tf.get_variable('w1', [self.n_features, n_l1], initializer=w_initializer,
+            with tf.compat.v1.variable_scope('l1'):
+                w1 = tf.compat.v1.get_variable('w1', [self.n_features, n_l1], initializer=w_initializer,
                                      collections=c_names)
-                b1 = tf.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
+                b1 = tf.compat.v1.get_variable('b1', [1, n_l1], initializer=b_initializer, collections=c_names)
                 l1 = tf.nn.relu(tf.matmul(self.s_, w1) + b1)
 
             # target_net 的第二层fc
-            with tf.variable_scope('l2'):
-                w2 = tf.get_variable('w2', [n_l1, self.n_actions], initializer=w_initializer,
+            with tf.compat.v1.variable_scope('l2'):
+                w2 = tf.compat.v1.get_variable('w2', [n_l1, self.n_actions], initializer=w_initializer,
                                      collections=c_names)
-                b2 = tf.get_variable('b2', [1, self.n_actions], initializer=b_initializer, collections=c_names)
+                b2 = tf.compat.v1.get_variable('b2', [1, self.n_actions], initializer=b_initializer, collections=c_names)
                 # 申请网络输出
                 self.q_next = tf.matmul(l1, w2) + b2
 
-        with tf.variable_scope('loss'):  # 求误差
+        with tf.compat.v1.variable_scope('loss'):  # 求误差
             # 使用平方误差
-            self.loss = tf.reduce_mean(tf.squared_difference(self.q_target, self.q_eval))
+            self.loss = tf.reduce_mean(tf.compat.v1.squared_difference(self.q_target, self.q_eval))
 
-        with tf.variable_scope("train"):
-            optimizer = tf.train.RMSPropOptimizer(self.lr)
+        with tf.compat.v1.variable_scope("train"):
+            optimizer = tf.compat.v1.train.RMSPropOptimizer(self.lr)
             self._train_op = optimizer.minimize(self.loss)
 
 
@@ -108,7 +108,7 @@ class DeepQNetwork(object):
         # 将observation的shape变为(1, size_of_observation)，行向量变为列向量才能与NN维度统一
         observation = observation[np.newaxis, :]
 
-        if np.random.uniform() < self.epslion:
+        if np.random.uniform() < self.epsilon:
             action_value = self.session.run(self.q_eval, feed_dict = {self.s: observation})
             action = np.argmax(action_value)
 
@@ -164,21 +164,46 @@ class DeepQNetwork(object):
 
         self.learn_step_counter += 1
 
-        def plot_cost(self):
-            import matplotlib.pyplot as plt
-            plt.plot(np.arange(len(self.cost_his)),self.cost_his)
-            plt.ylabel("Cost")
-            plt.xlabel("training steps")
-            plt.show()
+    def plot_cost(self):
+        import matplotlib.pyplot as plt
+        plt.plot(np.arange(len(self.cost_his)),self.cost_his)
+        plt.ylabel("Cost")
+        plt.xlabel("training steps")
+        plt.show()
 
 
 def run_maze():
-    pass
+    step = 0
+    for espisode in range(300):
+        observation = env.reset()
+        while True:
+            env.render()
+
+            action = RL.choose_action(observation)
+            observation_, reward, done = env.step(action)
+
+            RL.store_transition(observation, action, reward, observation_)
+
+            if (step>200) and (step % 5 == 0):
+                RL.learn()
+
+            observation = observation_
+
+            if done:
+                break
+            step +=1
 
 
+    print("game over!")
+    env.destroy()
 
+if __name__ == "__main__":
+    env = Maze()
+    # replace_target_iter为更新target network的步数，即fixed Q-targets
+    # memory_size为replay buffer的储存上限，用于不在实际交互下也能进行训练，即memory
+    RL = DeepQNetwork(env.n_actions, env.n_features, learning_rate=0.01, reward_decay=0.9, e_greedy=0.9,
+                      replace_target_iter=200, memory_size=2000, output_graph=True)
 
-
-
-
-
+    env.after(100, run_maze)
+    env.mainloop()
+    RL.plot_cost()
